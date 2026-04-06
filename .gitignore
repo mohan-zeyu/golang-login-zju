@@ -1,0 +1,53 @@
+# Binaries
+  *.exe
+  *.exe~
+  *.dll
+  *.so
+  *.dylib
+  /bin/
+  /build/
+
+  # Test binaries and coverage
+  *.test
+  *.out
+  coverage.txt
+  coverage.html
+
+  # Go workspace file
+  go.work
+  go.work.sum
+
+  # Environment / secrets
+  .env
+  .env.*
+  !.env.example
+  *.pem
+  *.key
+  credentials.json
+  secrets/
+
+  # Editor / IDE
+  .vscode/
+  .idea/
+  *.swp
+  *.swo
+  *~
+  .project
+  .settings/
+
+  # macOS / OS
+  .DS_Store
+  .DS_Store?
+  ._*
+  .Spotlight-V100
+  .Trashes
+  ehthumbs.db
+  Thumbs.db
+
+  # Logs
+  *.log
+  logs/
+
+  # Local dev artifacts
+  /tmp/
+  /.cache/
