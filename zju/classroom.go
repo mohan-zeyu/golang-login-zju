@@ -12,7 +12,51 @@ import (
 	"strings"
 	"time"
 )
-
+type ActivityType struct {
+	jyyymc string
+	jyyydm string
+}
+var ActivityTypeList = []ActivityType {
+	{
+		jyyymc: "社团",
+		jyyydm: "04",
+	},
+	{
+		jyyymc: "班会",
+		jyyydm: "3",
+	},
+	{
+		jyyymc: "教学",
+		jyyydm: "01",
+	},
+	{
+		jyyymc: "活动",
+		jyyydm: "02",
+	},
+	{
+		jyyymc: "培训",
+		jyyydm: "11",
+	},
+	{
+		jyyymc: "其它",
+		jyyydm: "12",
+	},
+	{
+		jyyymc: "考试",
+		jyyydm: "05",
+	},
+	{
+		jyyymc: "维修",
+		jyyydm: "06",
+	},
+}
+const (
+	JXZYGL_BASE = "https://jxzygl.zju.edu.cn"
+	INFOPLUS_BASE = "https://one.zju.edu.cn"
+	CAS_BASE = "https://zjuam.zju.edu.cn"
+	JXZYGL_SERVICE_URL = "https://jxzygl.zju.edu.cn/zypt/loading?redirect=/teacher/roomLoan"
+	INFO_URL = "https://one.zju.edu.cn/infoplus/interface/suggest"
+)
 type ClsrmErr struct {
 	err string
 }
@@ -90,9 +134,6 @@ func NewClassroom(username, password string) (*Classroom, error) {
 	defer cancel()
 	am := NewZJUAM(username, password, WithRedirectsDisabled())
 	fmt.Println("Step 1: Get CAS Service Ticket")
-	const CAS_BASE = "https://zjuam.zju.edu.cn"
-	const JXZYGL_SERVICE_URL = "https://jxzygl.zju.edu.cn/zypt/loading?redirect=/teacher/roomLoan"
-	const JXZYGL_BASE = "https://jxzygl.zju.edu.cn"
 
 	u, _ := url.Parse(CAS_BASE + "/cas/login")
 	q := u.Query()
@@ -191,19 +232,16 @@ func NewClassroom(username, password string) (*Classroom, error) {
 	return &Classroom{am: am, username: username, accessToken: accessToken}, nil
 }
 
-// Book submits a classroom booking application (Steps 4-8).
-func (c *Classroom) Book(msg *Message) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	const JXZYGL_BASE = "https://jxzygl.zju.edu.cn"
-	const INFOPLUS_BASE = "https://one.zju.edu.cn"
 
+
+
+func (c *Classroom) SubmitClassroom(ctx context.Context, msg *Message) (string, string, error) {
 	fmt.Println("Step 4: Submit Classroom Selection")
 	submitURL := JXZYGL_BASE + "/service-zypt/api/jsjy/jsjyjs/zjJsjysq"
 	body, err := json.Marshal(*msg.ClassroomSelection)
 	fmt.Println(string(body))
 	if err != nil {
-		return &ClsrmErr { err: "Step 4: invalid msg.ClassroomSelection"}
+		return "", "", &ClsrmErr { err: "Step 4: invalid msg.ClassroomSelection"}
 	}
 	opt := &RequestOptions {
 		Method: "POST",
@@ -219,23 +257,23 @@ func (c *Classroom) Book(msg *Message) error {
 	}
 	res, err := c.am.Fetch(ctx, submitURL, opt)
 	if err != nil {
-		return &ClsrmErr { err: "Step 4: selecetion submition failed" }
+		return "", "", &ClsrmErr { err: "Step 4: selecetion submition failed" }
 	}
 	defer res.Body.Close()
 	var data map[string]any
 	err = convertStreamToJSON(res.Body, &data)
 	fmt.Printf("%#v\n", data)
 	if err != nil {
-		return &ClsrmErr { err: "Step 4: Invalid data returned" }
+		return "", "", &ClsrmErr { err: "Step 4: Invalid data returned" }
 	}
 	// Extract the nested response: data.data is a map containing "tstjurl"
 	innerData, ok := data["data"].(map[string]any)
 	if data["code"] != "0" || !ok {
-		return &ClsrmErr{err: fmt.Sprintf("Step 4: Classroom selection failed: %v", data)}
+		return "", "", &ClsrmErr{err: fmt.Sprintf("Step 4: Classroom selection failed: %v", data)}
 	}
 	formURL, ok := innerData["tstjurl"].(string)
 	if !ok || formURL == "" {
-		return &ClsrmErr{err: "Step 4: No tstjurl in response"}
+		return "", "", &ClsrmErr{err: "Step 4: No tstjurl in response"}
 	}
 	fmt.Println("Step 4: Form URL:", formURL)
 
@@ -243,12 +281,12 @@ func (c *Classroom) Book(msg *Message) error {
 	stepMatch := regexp.MustCompile(`/form/(\d+)/render`)
 	stepSlice := stepMatch.FindStringSubmatch(formURL)
 	if stepSlice == nil {
-		return &ClsrmErr{err: "Step 4: Could not extract stepId from form URL"}
+		return "", "", &ClsrmErr{err: "Step 4: Could not extract stepId from form URL"}
 	}
 	stepId := stepSlice[1]
 	fmt.Println("Step 4: Step ID:", stepId)
 
-	// Phase 2 — Step 5+6: Follow redirect chain to reach the infoplus form page,
+	// Phase 2 — Step 5: Follow redirect chain to reach the infoplus form page,
 	// then extract the csrfToken from the rendered HTML.
 	fmt.Println("Step 5: Follow redirect chain to fetch infoplus form")
 	const MAX_REDIRECTS = 20
@@ -260,7 +298,7 @@ func (c *Classroom) Book(msg *Message) error {
 		chainRes, chainErr := c.am.Fetch(ctx, currentURL, nil)
 		if chainErr != nil {
 			fmt.Println(chainErr.Error())
-			return &ClsrmErr{err: "Step 5: Failed during redirect chain"}
+			return "", "", &ClsrmErr{err: "Step 5: Failed during redirect chain"}
 		}
 		loc := chainRes.Header.Get("Location")
 		fmt.Printf("  [%d] %d %s\n", i+1, chainRes.StatusCode, currentURL)
@@ -306,6 +344,19 @@ func (c *Classroom) Book(msg *Message) error {
 			fmt.Printf("  csrfToken found via \"%s\": %s\n", p.name, csrfToken)
 			break
 		}
+	}
+	return stepId, csrfToken, nil
+}
+
+
+
+// Book submits a classroom booking application (Steps 4-8).
+func (c *Classroom) Book(msg *Message) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	stepId, csrfToken, err := c.SubmitClassroom(ctx, msg)
+	if err != nil {
+		return &ClsrmErr {err: err.Error()}
 	}
 	if csrfToken == "" {
 		return &ClsrmErr{err: "Step 5: Could not extract csrfToken from HTML"}
@@ -395,6 +446,52 @@ func (c *Classroom) Book(msg *Message) error {
 	fmt.Println("  BOOKING SUBMITTED SUCCESSFULLY!")
 	return nil
 }
+
+
+func (c *Classroom) GetTeacherInfo (teacherName, stepId, csrfToken string) (float64, []any, error) {
+	Header := http.Header {
+		"Content-Type": {"application/x-www-form-urlencoded; charset=UTF-8"},
+		"Referer": {"https://one.zju.edu.cn/infoplus/form/" + 
+					stepId + "/render?theme=standard"},
+	}
+	infoBody := url.Values {
+		"type": {"User"},
+		"code": {""},
+		"field": {"fieldHDZZZ"},
+		"parent": {""},
+		"isTopLevel": {"true"},
+		"pageNo": {"0"},
+		"prefix": {teacherName},
+		"rand" : {fmt.Sprintf("%.14f", rand.Float64()*1000)},
+		"settings": {`{"userTraversal":true}`},
+		"csrfToken": {csrfToken},
+		"stepId": {stepId},
+	}
+	opt := &RequestOptions {
+		Method: "POST",
+		Headers: Header,
+		Body: strings.NewReader(infoBody.Encode()),
+	}
+	context, cancel := context.WithTimeout(context.Background(), 10 * time.Second)
+	defer cancel()
+	res, err := c.am.Fetch(context, INFO_URL, opt)
+	if err != nil {
+		return 0, nil, &ClsrmErr{err: "Failed to fetch teacher info"}
+	}
+	defer res.Body.Close()
+	var teacherInfo map[string]any
+	err = json.NewDecoder(res.Body).Decode(&teacherInfo)
+	if err != nil {
+		return 0, nil, &ClsrmErr {err: "failed to parse teacher info"}
+	}
+	totalNumber, ok := teacherInfo["total"].(float64)
+	if !ok { return 0, nil, &ClsrmErr {err: "Invalid total"}}
+	info, ok := teacherInfo["items"].([]any)
+	if !ok { return 0, nil, &ClsrmErr {err: "Invalid items"}}
+	return totalNumber, info, nil
+}
+
+
 
 // buildFormData constructs the full infoplus form payload matching the server's expected schema.
 func buildFormData(username, stepId string, cs *ClassroomSelection, ip *InfoplusData) map[string]any {

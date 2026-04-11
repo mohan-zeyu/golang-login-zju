@@ -9,12 +9,12 @@ import (
 	"net/url"
 	"context"
 )
-type Courses struct {
+type CoursesLogin struct {
 	am *ZJUAM
 	firstTime bool
 }
-func NewCourses (username, password string) *Courses {
-	return &Courses {
+func NewCourses (username, password string) *CoursesLogin {
+	return &CoursesLogin {
 		am: NewZJUAM(username, password, WithRedirectsDisabled()),
 		firstTime: true,
 	}
@@ -34,7 +34,7 @@ func Truncate (s string, n ...int) string {
 		return s
 	}
 }
-func (c *Courses) login (ctx context.Context) {
+func (c *CoursesLogin) login (ctx context.Context) {
 	fmt.Println("[COURSES] login begins")
 	currentURL := "https://courses.zju.edu.cn/user/index"
 	URL, _ := url.Parse(currentURL)
@@ -102,7 +102,7 @@ func (c *Courses) login (ctx context.Context) {
 	}
 	fmt.Println("[COURSES] Login finished.")
 }
-func (c *Courses) Fetch(ctx context.Context, url string, opt *RequestOptions) (*http.Response, error) {
+func (c *CoursesLogin) Fetch(ctx context.Context, url string, opt *RequestOptions) (*http.Response, error) {
 	if c.firstTime {
 		c.login(ctx)
 		c.firstTime = false

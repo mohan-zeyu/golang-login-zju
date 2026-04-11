@@ -1,19 +1,26 @@
 package test
 
 import (
-	"fmt"
-	"strings"
+	"context"
+	"encoding/json"
 	"os"
+	"strings"
+	"fmt"
 	"testing"
+	"time"
+
 	"github.com/mohan-zeyu/golang-login-zju/zju"
 )
 
-func TestClassroom (t *testing.T) {
-	username := os.Getenv("USERNAME")
-	password := os.Getenv("PASSWORD")
-	fmt.Println("Start testing for Classroom")
+func Test_GetTeacher(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Second)
+	defer cancel()
+	username, password := os.Getenv("USERNAME"), os.Getenv("PASSWORD")
 	c, err := zju.NewClassroom(username, password)
-	c.Book(&zju.Message{
+	if err != nil {
+		t.Error(err)
+	}
+	stepId, csrfToken, err := c.SubmitClassroom(ctx, &zju.Message{
 		ClassroomSelection: &zju.ClassroomSelection{
 			PkeyList: strings.Split(os.Getenv("CLASSROOM_PKEY_LIST"), ","),
 			Xnm:      os.Getenv("CLASSROOM_XNM"),
@@ -60,7 +67,16 @@ func TestClassroom (t *testing.T) {
 			GuidingTeacherAttr:     os.Getenv("INFOPLUS_GUIDING_TEACHER_ATTR"),
 		},
 	})
+	number, msg, err := c.GetTeacherInfo("张三", stepId, csrfToken)
 	if err != nil {
-		t.Errorf("%s", err)
+		t.Fatal(err)
 	}
+	fmt.Printf("\n\n")
+	fmt.Println("\n", number)
+	fmt.Printf("\n\n")
+	byte, err := json.MarshalIndent(msg, "", " ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(string(byte))
 }
