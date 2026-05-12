@@ -13,6 +13,9 @@ func TestClassroom (t *testing.T) {
 	password := os.Getenv("PASSWORD")
 	fmt.Println("Start testing for Classroom")
 	c, err := zju.NewClassroom(username, password)
+	if err != nil {
+		t.Error(err)
+	}
 	c.Book(&zju.Message{
 		ClassroomSelection: &zju.ClassroomSelection{
 			PkeyList: strings.Split(os.Getenv("CLASSROOM_PKEY_LIST"), ","),
