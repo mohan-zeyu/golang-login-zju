@@ -84,6 +84,8 @@ type ClassroomSelection struct {
 	Ksrq     string `json:"ksrq"`
 	Jsrq     string `json:"jsrq"`
 	ArrJcd   []int `json:"arr_jcd"`
+	ClassroomName string `json:"classroom_name"`
+	CampusID string `json:"campus_id"`
 }
 // InfoplusData holds all fields needed for the Phase 2 infoplus form submission
 type InfoplusData struct {
@@ -181,7 +183,6 @@ func NewClassroom(username, password string) (*Classroom, error) {
 	}
 	resp, err := am.Fetch(ctx, tokenURL, reqFull)
 	if err != nil {
-		fmt.Println(err.Error())
 		return nil, &ClsrmErr { err: "Step 2: Failed to get accessToken"}
 	}
 	defer resp.Body.Close()
@@ -232,10 +233,10 @@ func NewClassroom(username, password string) (*Classroom, error) {
 	return &Classroom{am: am, username: username, accessToken: accessToken}, nil
 }
 
-
-
-
 func (c *Classroom) SubmitClassroom(ctx context.Context, msg *Message) (string, string, error) {
+	if c == nil {
+		return "", "", &ClsrmErr{err: "Step4: Classroom object haven't been initialized"}
+	}
 	fmt.Println("Step 4: Submit Classroom Selection")
 	submitURL := JXZYGL_BASE + "/service-zypt/api/jsjy/jsjyjs/zjJsjysq"
 	body, err := json.Marshal(*msg.ClassroomSelection)
@@ -257,7 +258,7 @@ func (c *Classroom) SubmitClassroom(ctx context.Context, msg *Message) (string, 
 	}
 	res, err := c.am.Fetch(ctx, submitURL, opt)
 	if err != nil {
-		return "", "", &ClsrmErr { err: "Step 4: selecetion submition failed" }
+		return "", "", &ClsrmErr { err: "Step 4: selection submition failed" }
 	}
 	defer res.Body.Close()
 	var data map[string]any
@@ -301,9 +302,9 @@ func (c *Classroom) SubmitClassroom(ctx context.Context, msg *Message) (string, 
 			return "", "", &ClsrmErr{err: "Step 5: Failed during redirect chain"}
 		}
 		loc := chainRes.Header.Get("Location")
-		fmt.Printf("  [%d] %d %s\n", i+1, chainRes.StatusCode, currentURL)
+		fmt.Printf("  [%d] %d %s\n", i+1, chainRes.StatusCode, Truncate(currentURL))
 		if loc != "" {
-			fmt.Printf("      → %s\n", loc)
+			fmt.Printf("      → %s\n", Truncate(loc))
 		}
 
 		if chainRes.StatusCode >= 300 && chainRes.StatusCode < 400 && loc != "" {
@@ -664,11 +665,11 @@ func buildFormData(username, stepId string, cs *ClassroomSelection, ip *Infoplus
 		"fieldFJ": "",
 
 		// ── Resource info ──
-		"fieldZYXXMC":    []any{},
+		"fieldZYXXMC":    []string{cs.ClassroomName},
 		"fieldZYXXYYSJ":  []any{ip.TimeSlotLabel},
 		"fieldFZSFBXY":   "no",
-		"fieldFZJSSZXY":  "",
-		"fieldFZJS":      "",
+		"fieldFZJSSZXY":  cs.CampusID,
+		"fieldFZJS":      cs.ClassroomName,
 
 		// ── Approval fields (left empty for new submission) ──
 		"fieldYC1":        "",

@@ -8,7 +8,7 @@ import (
 	"github.com/joho/godotenv"
 )
 func TestMain (m *testing.M) {
-	_ = godotenv.Load("../.env")
+	_ = godotenv.Load("../.env.test")
 	os.Exit(m.Run())
 }
 

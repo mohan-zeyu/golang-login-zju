@@ -1,27 +1,26 @@
 package test
 
 import (
+	"context"
 	"fmt"
-	"strings"
 	"os"
+	"strings"
 	"testing"
+	"time"
+
 	"github.com/mohan-zeyu/golang-login-zju/zju"
 )
 
-func TestClassroom (t *testing.T) {
+func Test_Clsrm_Form (t *testing.T) {
 	username := os.Getenv("USERNAME")
 	password := os.Getenv("PASSWORD")
-	fmt.Println("Start testing for Classroom")
 	c, err := zju.NewClassroom(username, password)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	start := os.Getenv("CLASSROOM_KSRQ")
-	end := os.Getenv("CLASSROOM_JSRQ")
-	period := os.Getenv("CLASSROOM_ARR_JCD")
-	slots := strings.Split(period, ",")
-	timeslot := fmt.Sprintf("%s ~ %s (第%s-%s节)", start, end, slots[0], slots[len(slots)-1])
-	c.Book(&zju.Message{
+	ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Second)
+	defer cancel()
+	stepId, csrfToken, err := c.SubmitClassroom(ctx, &zju.Message{
 		ClassroomSelection: &zju.ClassroomSelection{
 			PkeyList: strings.Split(os.Getenv("CLASSROOM_PKEY_LIST"), ","),
 			Xnm:      os.Getenv("CLASSROOM_XNM"),
@@ -35,8 +34,8 @@ func TestClassroom (t *testing.T) {
 			Jyfs:     mustAtoi(os.Getenv("CLASSROOM_JYFS")),
 			Sqzt:     mustAtoi(os.Getenv("CLASSROOM_SQZT")),
 			Jylx:     os.Getenv("CLASSROOM_JYLX"),
-			Ksrq:     start,
-			Jsrq:     end,
+			Ksrq:     os.Getenv("CLASSROOM_KSRQ"),
+			Jsrq:     os.Getenv("CLASSROOM_JSRQ"),
 			ArrJcd:   mustSplitInts(os.Getenv("CLASSROOM_ARR_JCD")),
 			CampusID: os.Getenv("CAMPUS_ID"),
 			ClassroomName: os.Getenv("CLASSROOM_NAME"),
@@ -47,7 +46,6 @@ func TestClassroom (t *testing.T) {
 			Identity:         os.Getenv("INFOPLUS_IDENTITY"),
 			DepartmentCode:   os.Getenv("INFOPLUS_DEPARTMENT_CODE"),
 			DepartmentName:   os.Getenv("INFOPLUS_DEPARTMENT_NAME"),
-			TimeSlotLabel: 	  timeslot,
 
 			SupervisorCode:     os.Getenv("INFOPLUS_SUPERVISOR_CODE"),
 			SupervisorName:     os.Getenv("INFOPLUS_SUPERVISOR_NAME"),
@@ -69,9 +67,10 @@ func TestClassroom (t *testing.T) {
 			GuidingTeacherDeptName: os.Getenv("INFOPLUS_GUIDING_TEACHER_DEPT_NAME"),
 			GuidingTeacherPhone:    os.Getenv("INFOPLUS_GUIDING_TEACHER_PHONE"),
 			GuidingTeacherAttr:     os.Getenv("INFOPLUS_GUIDING_TEACHER_ATTR"),
-		},
+		},		
 	})
 	if err != nil {
 		t.Fatal(err.Error())
 	}
+	fmt.Println(stepId, csrfToken)
 }
